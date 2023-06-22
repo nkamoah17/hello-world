@@ -1,42 +1,43 @@
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
 import socket
-import os
+import threading
 
-# Generate a pair of RSA keys
-keys = RSA.generate(2048)
-public_key = keys.publickey()
+class ThreadedServer(object):
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind((self.host, self.port))
 
-# Create a cipher object
-cipher = PKCS1_OAEP.new(public_key)
+    def listen(self):
+        self.sock.listen(5)
+        while True:
+            client, address = self.sock.accept()
+            client.settimeout(60)
+            threading.Thread(target = self.listenToClient,args = (client,address)).start()
 
-# Create a socket object
-s = socket.socket()
+    def listenToClient(self, client, address):
+        size = 1024
+        while True:
+            try:
+                data = client.recv(size)
+                if data:
+                    # Set the response to echo back the recieved data 
+                    response = data
+                    client.send(response)
+                else:
+                    raise error('Client disconnected')
+            except:
+                client.close()
+                return False
 
-# Get local machine name
-host = socket.gethostname()
+if __name__ == "__main__":
+    while True:
+        port_num = input("Port? ")
+        try:
+            port_num = int(port_num)
+            break
+        except ValueError:
+            pass
 
-# Randomize the port number
-port = os.urandom(2)
-
-# Bind to the port
-s.bind((host, port))
-
-# Start listening for connections
-s.listen(5)
-
-while True:
-    # Accept a connection
-    c, addr = s.accept()
-    
-    # Receive the message
-    encrypted_message = c.recv(1024)
-
-    # Decrypt the message
-    message = cipher.decrypt(encrypted_message)
-
-    # Print the message
-    print(message.decode())
-
-    # Close the connection
-    c.close()
+    ThreadedServer('',port_num).listen()
